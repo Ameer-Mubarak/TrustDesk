@@ -1,0 +1,52 @@
+import { supabase } from './supabase';
+
+const API_URL = (import.meta.env.VITE_API_URL as string | undefined) ?? '/api';
+
+async function token() {
+  const { data, error } = await supabase.auth.getSession();
+  if (error || !data.session) throw new Error('Your session is not available.');
+  return data.session.access_token;
+}
+
+export async function apiRequest<T>(path: string, options: RequestInit = {}): Promise<T> {
+  const accessToken = await token();
+  const response = await fetch(`${API_URL}${path}`, {
+    ...options,
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${accessToken}`,
+      ...options.headers
+    }
+  });
+
+  if (!response.ok) {
+    const body = await response.json().catch(() => null);
+    throw new Error(body?.error?.message ?? 'The request failed.');
+  }
+
+  if (response.status === 204) return undefined as T;
+  return response.json() as Promise<T>;
+}
+
+export const api = {
+  organizations: () => apiRequest('/organizations'),
+  createOrganization: (payload: unknown) => apiRequest('/organizations', { method: 'POST', body: JSON.stringify(payload) }),
+  dashboard: (orgId: string) => apiRequest(`/organizations/${orgId}/dashboard`),
+  vendors: (orgId: string, query = '') => apiRequest(`/organizations/${orgId}/vendors${query}`),
+  createVendor: (orgId: string, payload: unknown) => apiRequest(`/organizations/${orgId}/vendors`, { method: 'POST', body: JSON.stringify(payload) }),
+  updateVendor: (orgId: string, vendorId: string, payload: unknown) => apiRequest(`/organizations/${orgId}/vendors/${vendorId}`, { method: 'PUT', body: JSON.stringify(payload) }),
+  deleteVendor: (orgId: string, vendorId: string) => apiRequest(`/organizations/${orgId}/vendors/${vendorId}`, { method: 'DELETE' }),
+  assessments: (orgId: string) => apiRequest(`/organizations/${orgId}/assessments`),
+  createAssessment: (orgId: string, payload: unknown) => apiRequest(`/organizations/${orgId}/assessments`, { method: 'POST', body: JSON.stringify(payload) }),
+  tasks: (orgId: string, query = '') => apiRequest(`/organizations/${orgId}/tasks${query}`),
+  createTask: (orgId: string, payload: unknown) => apiRequest(`/organizations/${orgId}/tasks`, { method: 'POST', body: JSON.stringify(payload) }),
+  updateTask: (orgId: string, taskId: string, payload: unknown) => apiRequest(`/organizations/${orgId}/tasks/${taskId}`, { method: 'PUT', body: JSON.stringify(payload) }),
+  members: (orgId: string) => apiRequest(`/organizations/${orgId}/members`),
+  invite: (orgId: string, payload: unknown) => apiRequest(`/organizations/${orgId}/invites`, { method: 'POST', body: JSON.stringify(payload) })
+};
+
+export function queryString(params: Record<string, string>) {
+  const query = new URLSearchParams(Object.entries(params).filter(([, value]) => value !== ''));
+  const value = query.toString();
+  return value ? `?${value}` : '';
+}
