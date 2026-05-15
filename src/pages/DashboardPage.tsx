@@ -7,7 +7,7 @@ import { useWorkspace } from '../context/WorkspaceContext';
 import { api } from '../lib/api';
 import { money, title } from '../lib/format';
 import type { Dashboard } from '../lib/types';
-import react from 'react';
+import React from 'react';
 
 export function DashboardPage() {
   const { currentOrg, loading: orgLoading } = useWorkspace();
