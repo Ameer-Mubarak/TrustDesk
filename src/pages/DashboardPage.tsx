@@ -7,6 +7,7 @@ import { useWorkspace } from '../context/WorkspaceContext';
 import { api } from '../lib/api';
 import { money, title } from '../lib/format';
 import type { Dashboard } from '../lib/types';
+import react from 'react';
 
 export function DashboardPage() {
   const { currentOrg, loading: orgLoading } = useWorkspace();
@@ -49,7 +50,7 @@ export function DashboardPage() {
       <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
         {metrics.map(([label, value, Icon]) => (
           <article className="panel p-5" key={String(label)}>
-            <Icon className="text-signal" size={21} />
+            {React.createElement(Icon as React.ComponentType<{ className?: string; size?: number }>, { className: "text-signal", size: 21 })}
             <p className="mt-4 text-2xl font-black">{value as string}</p>
             <p className="mt-1 text-sm font-semibold text-moss">{label as string}</p>
           </article>
