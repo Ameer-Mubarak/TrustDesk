@@ -22,8 +22,8 @@ api.get('/organizations/:orgId/vendors', asyncHandler(async (req, res) => res.js
 api.post('/organizations/:orgId/vendors', asyncHandler(async (req, res) => res.status(201).json(await createVendor(req, req.params.orgId, vendorSchema.parse(req.body)))));
 api.put('/organizations/:orgId/vendors/:vendorId', asyncHandler(async (req, res) => res.json(await updateVendor(req, req.params.orgId, req.params.vendorId, vendorSchema.parse(req.body)))));
 api.delete('/organizations/:orgId/vendors/:vendorId', asyncHandler(async (req, res) => {
-  await deleteVendor(req, req.params.orgId, req.params.vendorId);
-  res.status(204).send();
+await deleteVendor(req, req.params.orgId, req.params.vendorId);
+res.status(204).send();
 }));
 
 api.get('/organizations/:orgId/assessments', asyncHandler(async (req, res) => res.json(await listAssessments(req, req.params.orgId))));
