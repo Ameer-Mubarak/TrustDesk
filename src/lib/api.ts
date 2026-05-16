@@ -1,102 +1,124 @@
-import express from 'express';
-import cors from 'cors';
-import helmet from 'helmet';
-import { env } from './config/env';
-import { api } from './routes/api';
-import { errorHandler } from './middleware/errors';
+import { supabase } from './supabase';
 
-const app = express();
+const API_ORIGIN = ((import.meta.env.VITE_API_URL as string | undefined) ?? '')
+  .trim()
+  .replace(/\/+$/, '');
 
-/* =========================
-   TRUST PROXY (Railway / Vercel)
-========================= */
-app.set('trust proxy', 1);
+if (!API_ORIGIN) {
+  throw new Error('Missing VITE_API_URL');
+}
 
-/* =========================
-   SECURITY HEADERS
-========================= */
-app.use(
-  helmet({
-    crossOriginResourcePolicy: { policy: 'cross-origin' }
-  })
-);
+function buildApiUrl(path: string) {
+  const cleanPath = path.replace(/^\/+/, '');
+  return `${API_ORIGIN}/api/${cleanPath}`;
+}
 
-/* =========================
-   CORS CONFIG (FIXED)
-   - prevents OPTIONS 500
-   - avoids origin crash
-========================= */
-const corsOptions: cors.CorsOptions = {
-  origin(origin, callback) {
-    if (!origin) return callback(null, true);
+async function getToken(): Promise<string> {
+  const { data, error } = await supabase.auth.getSession();
 
-    if (env.allowedOrigins.includes(origin)) {
-      return callback(null, true);
+  if (error || !data.session) {
+    throw new Error('Session not available');
+  }
+
+  return data.session.access_token;
+}
+
+export async function apiRequest<T>(
+  path: string,
+  options: RequestInit = {}
+): Promise<T> {
+  const token = await getToken();
+
+  const response = await fetch(buildApiUrl(path), {
+    ...options,
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${token}`,
+      ...(options.headers || {})
     }
+  });
 
-    return callback(null, false);
-  },
-  credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization']
+  if (!response.ok) {
+    const body = await response.json().catch(() => null);
+    throw new Error(body?.error?.message ?? 'Request failed');
+  }
+
+  if (response.status === 204) {
+    return undefined as T;
+  }
+
+  return (await response.json()) as T;
+}
+
+export const api = {
+  organizations: () => apiRequest('/organizations'),
+  createOrganization: (payload: unknown) =>
+    apiRequest('/organizations', {
+      method: 'POST',
+      body: JSON.stringify(payload)
+    }),
+
+  dashboard: (orgId: string) =>
+    apiRequest(`/organizations/${orgId}/dashboard`),
+
+  vendors: (orgId: string, query = '') =>
+    apiRequest(`/organizations/${orgId}/vendors${query}`),
+
+  createVendor: (orgId: string, payload: unknown) =>
+    apiRequest(`/organizations/${orgId}/vendors`, {
+      method: 'POST',
+      body: JSON.stringify(payload)
+    }),
+
+  updateVendor: (orgId: string, vendorId: string, payload: unknown) =>
+    apiRequest(`/organizations/${orgId}/vendors/${vendorId}`, {
+      method: 'PUT',
+      body: JSON.stringify(payload)
+    }),
+
+  deleteVendor: (orgId: string, vendorId: string) =>
+    apiRequest(`/organizations/${orgId}/vendors/${vendorId}`, {
+      method: 'DELETE'
+    }),
+
+  assessments: (orgId: string) =>
+    apiRequest(`/organizations/${orgId}/assessments`),
+
+  createAssessment: (orgId: string, payload: unknown) =>
+    apiRequest(`/organizations/${orgId}/assessments`, {
+      method: 'POST',
+      body: JSON.stringify(payload)
+    }),
+
+  tasks: (orgId: string, query = '') =>
+    apiRequest(`/organizations/${orgId}/tasks${query}`),
+
+  createTask: (orgId: string, payload: unknown) =>
+    apiRequest(`/organizations/${orgId}/tasks`, {
+      method: 'POST',
+      body: JSON.stringify(payload)
+    }),
+
+  updateTask: (orgId: string, taskId: string, payload: unknown) =>
+    apiRequest(`/organizations/${orgId}/tasks/${taskId}`, {
+      method: 'PUT',
+      body: JSON.stringify(payload)
+    }),
+
+  members: (orgId: string) =>
+    apiRequest(`/organizations/${orgId}/members`),
+
+  invite: (orgId: string, payload: unknown) =>
+    apiRequest(`/organizations/${orgId}/invites`, {
+      method: 'POST',
+      body: JSON.stringify(payload)
+    })
 };
 
-app.use(cors(corsOptions));
-app.options('*', cors(corsOptions));
-
-/* =========================
-   BODY PARSING
-========================= */
-app.use(express.json({ limit: '1mb' }));
-app.use(express.urlencoded({ extended: true }));
-
-/* =========================
-   HEALTH CHECK
-========================= */
-app.get('/health', (_req, res) => {
-  res.status(200).json({
-    status: 'ok',
-    service: 'trustdesk',
-    time: new Date().toISOString()
-  });
-});
-
-/* =========================
-   API ROUTES
-   IMPORTANT: avoid /api// bugs
-========================= */
-app.use('/api', api);
-
-/* =========================
-   404 HANDLER
-========================= */
-app.use((_req, res) => {
-  res.status(404).json({
-    error: { message: 'Route not found' }
-  });
-});
-
-/* =========================
-   GLOBAL ERROR HANDLER
-========================= */
-app.use(errorHandler);
-
-/* =========================
-   SAFE PROCESS HANDLERS
-========================= */
-process.on('unhandledRejection', (err) => {
-  console.error('UnhandledRejection:', err);
-});
-
-process.on('uncaughtException', (err) => {
-  console.error('UncaughtException:', err);
-});
-
-/* =========================
-   START SERVER
-========================= */
-const port = env.port || 4100;
-
-app.listen(port, () => {
-  console.log(`Server running on ${port}`);
-});
+export function queryString(params: Record<string, string>) {
+  const query = new URLSearchParams(
+    Object.entries(params).filter(([, value]) => value !== '')
+  );
+  const value = query.toString();
+  return value ? `?${value}` : '';
+}
