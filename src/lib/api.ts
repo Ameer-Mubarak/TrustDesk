@@ -1,35 +1,32 @@
 import { supabase } from './supabase';
 
 /* =========================
-   SAFE BASE URL
-   - removes trailing slash
-   - prevents // bugs
+   BASE URL (SAFE)
 ========================= */
-const API_URL = (
-  (import.meta.env.VITE_API_URL as string | undefined) ?? '/api'
-).replace(/\/$/, '');
+const API_URL = ((import.meta.env.VITE_API_URL as string | undefined) ?? '/api')
+  .replace(/\/$/, '');
 
 /* =========================
-   GET SUPABASE TOKEN
+   AUTH TOKEN
 ========================= */
-async function token() {
+async function getToken(): Promise<string> {
   const { data, error } = await supabase.auth.getSession();
 
   if (error || !data.session) {
-    throw new Error('Session not available.');
+    throw new Error('Session not available');
   }
 
   return data.session.access_token;
 }
 
 /* =========================
-   CORE REQUEST WRAPPER
+   API CORE
 ========================= */
 export async function apiRequest<T>(
   path: string,
   options: RequestInit = {}
 ): Promise<T> {
-  const accessToken = await token();
+  const token = await getToken();
 
   const url = `${API_URL}/${path.replace(/^\//, '')}`;
 
@@ -37,7 +34,7 @@ export async function apiRequest<T>(
     ...options,
     headers: {
       'Content-Type': 'application/json',
-      Authorization: `Bearer ${accessToken}`,
+      Authorization: `Bearer ${token}`,
       ...(options.headers || {})
     }
   });
@@ -51,15 +48,14 @@ export async function apiRequest<T>(
     return undefined as T;
   }
 
-  return response.json() as Promise<T>;
+  return (await response.json()) as T;
 }
 
 /* =========================
-   API METHODS
+   API ENDPOINTS
 ========================= */
 export const api = {
-  organizations: () =>
-    apiRequest('/organizations'),
+  organizations: () => apiRequest('/organizations'),
 
   createOrganization: (payload: unknown) =>
     apiRequest('/organizations', {
@@ -125,7 +121,7 @@ export const api = {
 };
 
 /* =========================
-   QUERY STRING UTILITY
+   QUERY STRING HELPER
 ========================= */
 export function queryString(params: Record<string, string>) {
   const query = new URLSearchParams(
@@ -133,6 +129,5 @@ export function queryString(params: Record<string, string>) {
   );
 
   const value = query.toString();
-
   return value ? `?${value}` : '';
 }
