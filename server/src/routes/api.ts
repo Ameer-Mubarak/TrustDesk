@@ -1,5 +1,4 @@
 import { Router } from 'express';
-
 import { asyncHandler } from '../middleware/errors';
 import { requireAuth } from '../middleware/auth';
 
@@ -22,7 +21,6 @@ import {
 } from '../services/organizationService';
 
 import { getDashboard } from '../services/reportService';
-
 import {
   createVendor,
   deleteVendor,
@@ -34,62 +32,60 @@ import {
 export const api = Router();
 
 /* =========================
-   HEALTH
+   PUBLIC ROUTES (NO AUTH)
 ========================= */
-api.get('/health', (_req, res) => {
-  res.json({ ok: true, service: 'trustdesk-api' });
-});
+api.get('/health', (_req, res) =>
+  res.json({ ok: true, service: 'trustdesk-api' })
+);
 
 /* =========================
-   OPTIONS / PREFLIGHT
+   AUTH MIDDLEWARE (ALL BELOW PROTECTED)
 ========================= */
-api.options('*', (_req, res) => {
-  res.sendStatus(204);
-});
-
-/* =========================
-   AUTH
-   Skip OPTIONS explicitly
-========================= */
-api.use((req, res, next) => {
-  if (req.method === 'OPTIONS') {
-    return res.sendStatus(204);
-  }
-
-  return requireAuth(req, res, next);
-});
+api.use(requireAuth);
 
 /* =========================
    ORGANIZATIONS
 ========================= */
 api.get(
   '/organizations',
-  asyncHandler(async (req, res) => {
-    res.json(await listOrganizations(req));
-  })
+  asyncHandler(async (req, res) =>
+    res.json(await listOrganizations(req))
+  )
 );
 
 api.post(
   '/organizations',
-  asyncHandler(async (req, res) => {
-    const data = createOrgSchema.parse(req.body);
-    res.status(201).json(await createOrganization(req, data));
-  })
+  asyncHandler(async (req, res) =>
+    res.status(201).json(
+      await createOrganization(
+        req,
+        createOrgSchema.parse(req.body)
+      )
+    )
+  )
 );
 
+/* =========================
+   MEMBERS / INVITES
+========================= */
 api.get(
   '/organizations/:orgId/members',
-  asyncHandler(async (req, res) => {
-    res.json(await listMembers(req, req.params.orgId));
-  })
+  asyncHandler(async (req, res) =>
+    res.json(await listMembers(req, req.params.orgId))
+  )
 );
 
 api.post(
   '/organizations/:orgId/invites',
-  asyncHandler(async (req, res) => {
-    const data = inviteSchema.parse(req.body);
-    res.status(201).json(await inviteMember(req, req.params.orgId, data));
-  })
+  asyncHandler(async (req, res) =>
+    res.status(201).json(
+      await inviteMember(
+        req,
+        req.params.orgId,
+        inviteSchema.parse(req.body)
+      )
+    )
+  )
 );
 
 /* =========================
@@ -97,9 +93,9 @@ api.post(
 ========================= */
 api.get(
   '/organizations/:orgId/dashboard',
-  asyncHandler(async (req, res) => {
-    res.json(await getDashboard(req, req.params.orgId));
-  })
+  asyncHandler(async (req, res) =>
+    res.json(await getDashboard(req, req.params.orgId))
+  )
 );
 
 /* =========================
@@ -107,25 +103,36 @@ api.get(
 ========================= */
 api.get(
   '/organizations/:orgId/vendors',
-  asyncHandler(async (req, res) => {
-    res.json(await listVendors(req, req.params.orgId));
-  })
+  asyncHandler(async (req, res) =>
+    res.json(await listVendors(req, req.params.orgId))
+  )
 );
 
 api.post(
   '/organizations/:orgId/vendors',
-  asyncHandler(async (req, res) => {
-    const data = vendorSchema.parse(req.body);
-    res.status(201).json(await createVendor(req, req.params.orgId, data));
-  })
+  asyncHandler(async (req, res) =>
+    res.status(201).json(
+      await createVendor(
+        req,
+        req.params.orgId,
+        vendorSchema.parse(req.body)
+      )
+    )
+  )
 );
 
 api.put(
   '/organizations/:orgId/vendors/:vendorId',
-  asyncHandler(async (req, res) => {
-    const data = vendorSchema.parse(req.body);
-    res.json(await updateVendor(req, req.params.orgId, req.params.vendorId, data));
-  })
+  asyncHandler(async (req, res) =>
+    res.json(
+      await updateVendor(
+        req,
+        req.params.orgId,
+        req.params.vendorId,
+        vendorSchema.parse(req.body)
+      )
+    )
+  )
 );
 
 api.delete(
@@ -141,17 +148,22 @@ api.delete(
 ========================= */
 api.get(
   '/organizations/:orgId/assessments',
-  asyncHandler(async (req, res) => {
-    res.json(await listAssessments(req, req.params.orgId));
-  })
+  asyncHandler(async (req, res) =>
+    res.json(await listAssessments(req, req.params.orgId))
+  )
 );
 
 api.post(
   '/organizations/:orgId/assessments',
-  asyncHandler(async (req, res) => {
-    const data = assessmentSchema.parse(req.body);
-    res.status(201).json(await createAssessment(req, req.params.orgId, data));
-  })
+  asyncHandler(async (req, res) =>
+    res.status(201).json(
+      await createAssessment(
+        req,
+        req.params.orgId,
+        assessmentSchema.parse(req.body)
+      )
+    )
+  )
 );
 
 /* =========================
@@ -159,23 +171,34 @@ api.post(
 ========================= */
 api.get(
   '/organizations/:orgId/tasks',
-  asyncHandler(async (req, res) => {
-    res.json(await listTasks(req, req.params.orgId));
-  })
+  asyncHandler(async (req, res) =>
+    res.json(await listTasks(req, req.params.orgId))
+  )
 );
 
 api.post(
   '/organizations/:orgId/tasks',
-  asyncHandler(async (req, res) => {
-    const data = taskSchema.parse(req.body);
-    res.status(201).json(await upsertTask(req, req.params.orgId, data));
-  })
+  asyncHandler(async (req, res) =>
+    res.status(201).json(
+      await upsertTask(
+        req,
+        req.params.orgId,
+        taskSchema.parse(req.body)
+      )
+    )
+  )
 );
 
 api.put(
   '/organizations/:orgId/tasks/:taskId',
-  asyncHandler(async (req, res) => {
-    const data = taskSchema.parse(req.body);
-    res.json(await upsertTask(req, req.params.orgId, data, req.params.taskId));
-  })
+  asyncHandler(async (req, res) =>
+    res.json(
+      await upsertTask(
+        req,
+        req.params.orgId,
+        taskSchema.parse(req.body),
+        req.params.taskId
+      )
+    )
+  )
 );
