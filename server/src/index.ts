@@ -1,56 +1,84 @@
-import express from "express";
-import cors from "cors";
-import helmet from "helmet";
-import { env } from "./config/env";
-import { api } from "./routes/api";
-import { errorHandler } from "./middleware/errors";
+import cors from 'cors';
+import express from 'express';
+import helmet from 'helmet';
+
+import { env } from './config/env';
+import { api } from './routes/api';
+import { errorHandler } from './middleware/errors';
 
 const app = express();
 
-/* =========================
-   SECURITY MIDDLEWARE
-========================= */
-app.use(helmet());
+app.set('trust proxy', 1);
 
 /* =========================
-   CORS FIX (CRITICAL)
+   NORMALIZE DOUBLE SLASHES
 ========================= */
-app.use(cors({
+app.use((req, _res, next) => {
+  req.url = req.url.replace(/\/{2,}/g, '/');
+  next();
+});
+
+/* =========================
+   SECURITY
+========================= */
+app.use(
+  helmet({
+    crossOriginResourcePolicy: { policy: 'cross-origin' }
+  })
+);
+
+/* =========================
+   CORS
+========================= */
+const corsOptions: cors.CorsOptions = {
   origin(origin, callback) {
-    // allow mobile apps / server-to-server
     if (!origin) return callback(null, true);
 
-    // allow only whitelist
     if (env.allowedOrigins.includes(origin)) {
       return callback(null, true);
     }
 
-    // IMPORTANT: do NOT throw error (prevents 500)
     return callback(null, false);
   },
   credentials: true,
-  methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"]
-}));
+  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization']
+};
 
-// IMPORTANT: handle preflight explicitly
-app.options("*", cors());
+app.use(cors(corsOptions));
+app.options('*', cors(corsOptions));
 
 /* =========================
-   BODY PARSER
+   BODY PARSING
 ========================= */
-app.use(express.json({ limit: "1mb" }));
+app.use(express.json({ limit: '1mb' }));
 app.use(express.urlencoded({ extended: true }));
 
 /* =========================
-   ROUTES
+   HEALTH
 ========================= */
-app.use("/api", api);
+app.get('/health', (_req, res) => {
+  res.status(200).json({
+    status: 'ok',
+    service: 'trustdesk-api',
+    timestamp: new Date().toISOString()
+  });
+});
 
 /* =========================
-   HEALTH CHECK (optional but recommended)
+   API ROUTES
 ========================= */
-app.get("/health", (_req, res) => {
-  res.json({ status: "ok" });
+app.use('/api', api);
+
+/* =========================
+   404
+========================= */
+app.use((_req, res) => {
+  res.status(404).json({
+    error: {
+      message: 'Route not found'
+    }
+  });
 });
 
 /* =========================
@@ -59,10 +87,21 @@ app.get("/health", (_req, res) => {
 app.use(errorHandler);
 
 /* =========================
-   START SERVER
+   PROCESS SAFETY
 ========================= */
-const PORT = env.port || 4100;
+process.on('unhandledRejection', (reason) => {
+  console.error('Unhandled Rejection:', reason);
+});
 
-app.listen(PORT, () => {
-  console.log(`API running on port ${PORT}`);
+process.on('uncaughtException', (error) => {
+  console.error('Uncaught Exception:', error);
+});
+
+/* =========================
+   START
+========================= */
+const port = env.port || 4100;
+
+app.listen(port, () => {
+  console.log(`TrustDesk API listening on port ${port}`);
 });
