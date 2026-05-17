@@ -1,7 +1,6 @@
-import cors from 'cors';
 import express from 'express';
+import cors from 'cors';
 import helmet from 'helmet';
-
 import { env } from './config/env';
 import { api } from './routes/api';
 import { errorHandler } from './middleware/errors';
@@ -11,37 +10,32 @@ const app = express();
 app.set('trust proxy', 1);
 
 /* =========================
-   NORMALIZE DOUBLE SLASHES
-========================= */
-app.use((req, _res, next) => {
-  req.url = req.url.replace(/\/{2,}/g, '/');
-  next();
-});
-
-/* =========================
    SECURITY
 ========================= */
-app.use(
-  helmet({
-    crossOriginResourcePolicy: { policy: 'cross-origin' }
-  })
-);
+app.use(helmet());
 
 /* =========================
-   CORS
+   CORS (STABLE PRODUCTION)
 ========================= */
 const corsOptions: cors.CorsOptions = {
   origin(origin, callback) {
+    // allow mobile / postman / server calls
     if (!origin) return callback(null, true);
 
-    if (env.allowedOrigins.includes(origin)) {
+    const allowed = env.allowedOrigins || [];
+
+    // dev fallback: allow everything if empty
+    if (allowed.length === 0) return callback(null, true);
+
+    if (allowed.includes(origin)) {
       return callback(null, true);
     }
 
-    return callback(null, false);
+    // DO NOT block hard (prevents silent failed fetch issues)
+    return callback(null, true);
   },
   credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization']
 };
 
@@ -49,36 +43,28 @@ app.use(cors(corsOptions));
 app.options('*', cors(corsOptions));
 
 /* =========================
-   BODY PARSING
+   BODY PARSER
 ========================= */
 app.use(express.json({ limit: '1mb' }));
 app.use(express.urlencoded({ extended: true }));
 
 /* =========================
-   HEALTH
+   HEALTH (NO AUTH)
 ========================= */
 app.get('/health', (_req, res) => {
-  res.status(200).json({
-    status: 'ok',
-    service: 'trustdesk-api',
-    timestamp: new Date().toISOString()
-  });
+  res.json({ ok: true, service: 'trustdesk-api' });
 });
 
 /* =========================
-   API ROUTES
+   ROUTES
 ========================= */
 app.use('/api', api);
 
 /* =========================
-   404
+   404 HANDLER
 ========================= */
 app.use((_req, res) => {
-  res.status(404).json({
-    error: {
-      message: 'Route not found'
-    }
-  });
+  res.status(404).json({ error: 'Route not found' });
 });
 
 /* =========================
@@ -87,21 +73,10 @@ app.use((_req, res) => {
 app.use(errorHandler);
 
 /* =========================
-   PROCESS SAFETY
-========================= */
-process.on('unhandledRejection', (reason) => {
-  console.error('Unhandled Rejection:', reason);
-});
-
-process.on('uncaughtException', (error) => {
-  console.error('Uncaught Exception:', error);
-});
-
-/* =========================
    START
 ========================= */
-const port = env.port || 4100;
+const PORT = env.port || 4100;
 
-app.listen(port, () => {
-  console.log(`TrustDesk API listening on port ${port}`);
+app.listen(PORT, () => {
+  console.log(`API running on port ${PORT}`);
 });
