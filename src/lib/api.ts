@@ -1,24 +1,16 @@
 import { supabase } from './supabase';
 
-const API_ORIGIN = (import.meta.env.VITE_API_URL as string | undefined)?.trim().replace(/\/+$/, '');
+const RAW_API_URL = (import.meta.env.VITE_API_URL as string | undefined)?.trim();
 
-if (!API_ORIGIN) {
+if (!RAW_API_URL) {
   throw new Error('Missing VITE_API_URL');
 }
 
-function joinUrl(...parts: string[]) {
-  return parts
-    .map((part, index) =>
-      index === 0
-        ? part.replace(/\/+$/, '')
-        : part.replace(/^\/+|\/+$/g, '')
-    )
-    .join('/');
-}
+const API_ORIGIN = RAW_API_URL.replace(/\/+$/, '').replace(/\/api$/, '');
 
 function buildApiUrl(path: string) {
   const cleanPath = path.replace(/^\/+/, '');
-  return joinUrl(API_ORIGIN, 'api', cleanPath);
+  return `${API_ORIGIN}/api/${cleanPath}`;
 }
 
 async function getToken(): Promise<string> {
