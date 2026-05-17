@@ -1,16 +1,24 @@
 import { supabase } from './supabase';
 
-const API_ORIGIN = ((import.meta.env.VITE_API_URL as string | undefined) ?? '')
-  .trim()
-  .replace(/\/+$/, '');
+const API_ORIGIN = (import.meta.env.VITE_API_URL as string | undefined)?.trim().replace(/\/+$/, '');
 
 if (!API_ORIGIN) {
   throw new Error('Missing VITE_API_URL');
 }
 
+function joinUrl(...parts: string[]) {
+  return parts
+    .map((part, index) =>
+      index === 0
+        ? part.replace(/\/+$/, '')
+        : part.replace(/^\/+|\/+$/g, '')
+    )
+    .join('/');
+}
+
 function buildApiUrl(path: string) {
   const cleanPath = path.replace(/^\/+/, '');
-  return `${API_ORIGIN}/api/${cleanPath}`;
+  return joinUrl(API_ORIGIN, 'api', cleanPath);
 }
 
 async function getToken(): Promise<string> {
@@ -27,20 +35,29 @@ export async function apiRequest<T>(
   path: string,
   options: RequestInit = {}
 ): Promise<T> {
-  const token = await getToken();
+  const accessToken = await getToken();
+  const url = buildApiUrl(path);
 
-  const response = await fetch(buildApiUrl(path), {
+  const response = await fetch(url, {
     ...options,
     headers: {
       'Content-Type': 'application/json',
-      Authorization: `Bearer ${token}`,
+      Authorization: `Bearer ${accessToken}`,
       ...(options.headers || {})
     }
   });
 
   if (!response.ok) {
-    const body = await response.json().catch(() => null);
-    throw new Error(body?.error?.message ?? 'Request failed');
+    let message = 'Request failed';
+
+    try {
+      const body = await response.json();
+      message = body?.error?.message ?? body?.message ?? message;
+    } catch {
+      // ignore non-JSON error bodies
+    }
+
+    throw new Error(message);
   }
 
   if (response.status === 204) {
@@ -52,6 +69,7 @@ export async function apiRequest<T>(
 
 export const api = {
   organizations: () => apiRequest('/organizations'),
+
   createOrganization: (payload: unknown) =>
     apiRequest('/organizations', {
       method: 'POST',
@@ -119,6 +137,7 @@ export function queryString(params: Record<string, string>) {
   const query = new URLSearchParams(
     Object.entries(params).filter(([, value]) => value !== '')
   );
+
   const value = query.toString();
   return value ? `?${value}` : '';
 }
